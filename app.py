@@ -152,6 +152,50 @@ def criar():
     return jsonify(id=c.lastrowid), 201
 
 
+@app.post("/api/placas")
+@auth
+def criar():
+    d, e = validar(request.get_json(silent=True) or {}, criar=True)
+    if e:
+        return jsonify(erro=e), 400
+    try:
+        c = db().execute(
+            "INSERT INTO placas(codigo,nome,tipo,url) VALUES(?,?,?,?)",
+            (d["codigo"], d["nome"], d["tipo"], d["url"]))
+        db().commit()
+    except sqlite3.IntegrityError:
+        return jsonify(erro="Já existe uma placa com esse código."), 409
+    return jsonify(id=c.lastrowid), 201
+
+
+# COLE O NOVO CÓDIGO AQUI EMBAIXO (sem recuo/espaço na margem esquerda):
+@app.post("/api/placas/lote")
+@auth
+def criar_lote():
+    """Gera um lote de placas em branco (ex: PLACA01 até PLACA50) para você já deixar impresso."""
+    j = request.get_json(silent=True) or {}
+    prefixo = str(j.get("prefixo") or "PLACA").strip().upper()
+    inicio = int(j.get("inicio", 1))
+    fim = int(j.get("fim", 10))
+
+    criadas = 0
+    with db() as con:
+        for i in range(inicio, fim + 1):
+            codigo = f"{prefixo}{i:02d}"
+            try:
+                con.execute(
+                    "INSERT INTO placas(codigo, nome, tipo, url, ativa) VALUES(?, ?, ?, ?, ?)",
+                    (codigo, f"Não configurada ({codigo})",
+                     "google", "https://google.com", 0)
+                )
+                criadas += 1
+            except sqlite3.IntegrityError:
+                pass
+        con.commit()
+
+    return jsonify(ok=True, criadas=criadas)
+
+
 @app.put("/api/placas/<int:pid>")
 @auth
 def editar(pid):
@@ -190,15 +234,27 @@ PAGINA = """<!doctype html><html lang="pt-BR"><meta charset="utf-8">
 def redirecionar(codigo):
     p = db().execute("SELECT * FROM placas WHERE codigo=?", (codigo.upper(),)).fetchone()
     if not p:
-        return render_template_string(PAGINA, t="Placa não encontrada", m="Este código não existe."), 404
+        return render_template_string(PAGINA, t="Placa não encontrada", m="Este código não existe no sistema."), 404
+
+    # Se a placa está inativa ou ainda com o link padrão de não configurada
+    if not p["ativa"] or (p["url"] == "https://google.com" and "Não configurada" in p["nome"]):
+        return render_template_string(
+            PAGINA,
+            t="Placa aguardando configuração",
+            m=f"A placa <code>{p['codigo']}</code> ainda não foi configurada pelo estabelecimento."
+        ), 200
+
     if not p["ativa"]:
         return render_template_string(PAGINA, t="Placa inativa", m="Esta placa foi desativada pelo estabelecimento."), 410
+
     db().execute("UPDATE placas SET cliques=cliques+1 WHERE id=?", (p["id"],))
     db().commit()
+
     if p["tipo"] == "pix":
         r = render_template_string(
             PAGINA, t=p["nome"], m="Copie a chave e cole no app do seu banco.", chave=p["url"])
         return r, 200, {"Cache-Control": "no-store"}
+
     resp = redirect(p["url"], 302)
     resp.headers["Cache-Control"] = "no-store"
     return resp
