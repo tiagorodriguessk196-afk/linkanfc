@@ -152,22 +152,6 @@ def criar():
     return jsonify(id=c.lastrowid), 201
 
 
-@app.post("/api/placas")
-@auth
-def criar():
-    d, e = validar(request.get_json(silent=True) or {}, criar=True)
-    if e:
-        return jsonify(erro=e), 400
-    try:
-        c = db().execute(
-            "INSERT INTO placas(codigo,nome,tipo,url) VALUES(?,?,?,?)",
-            (d["codigo"], d["nome"], d["tipo"], d["url"]))
-        db().commit()
-    except sqlite3.IntegrityError:
-        return jsonify(erro="Já existe uma placa com esse código."), 409
-    return jsonify(id=c.lastrowid), 201
-
-
 # COLE O NOVO CÓDIGO AQUI EMBAIXO (sem recuo/espaço na margem esquerda):
 @app.post("/api/placas/lote")
 @auth
