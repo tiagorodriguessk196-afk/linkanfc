@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LinkaNFC - Painel</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={darkMode:'class'}</script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+body{font-family:'Inter',sans-serif}
+.glass{background:rgba(30,41,59,.7);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.08)}
+#qr canvas,#qr img{width:220px;height:220px}
+.inp{width:100%;background:#020617;border:1px solid #1e293b;border-radius:.75rem;padding:.5rem .75rem;font-size:.75rem;color:#e2e8f0;outline:none}
+.inp:focus{border-color:#6366f1}
+</style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased flex flex-col">
+
+<!-- Login -->
+<div id="login" class="hidden fixed inset-0 z-[60] bg-slate-950 flex items-center justify-center p-4">
+  <form onsubmit="entrar(event)" class="glass rounded-2xl p-6 w-full max-w-xs space-y-4">
+    <h2 class="font-bold text-lg text-center">LinkaNFC Admin</h2>
+    <input id="senha" type="password" required placeholder="Senha de acesso" class="inp" autocomplete="current-password">
+    <p id="login-erro" class="text-xs text-rose-400 hidden"></p>
+    <button class="w-full bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold py-2.5 rounded-xl">Entrar</button>
+  </form>
+</div>
+
+<header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+  <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center"><i class="fa-solid fa-wifi"></i></div>
+      <div><h1 class="font-bold leading-tight">LinkaNFC Admin</h1><p id="negocio" class="text-xs text-slate-400"></p></div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="abrirForm()" class="bg-indigo-600 hover:bg-indigo-500 text-xs sm:text-sm font-medium px-4 py-2 rounded-xl flex items-center gap-2"><i class="fa-solid fa-plus"></i><span class="hidden sm:inline">Nova Placa</span></button>
+      <button onclick="sair()" title="Sair" class="p-2 text-slate-400 hover:text-white"><i class="fa-solid fa-right-from-bracket"></i></button>
+    </div>
+  </div>
+</header>
+
+<main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+  <section class="lg:col-span-7 xl:col-span-8 flex flex-col gap-6">
+    <div class="grid grid-cols-3 gap-4">
+      <div class="glass p-4 rounded-2xl"><p class="text-xs text-slate-400 mb-1">Placas ativas</p><p class="text-2xl font-bold" id="s-ativas">0</p></div>
+      <div class="glass p-4 rounded-2xl"><p class="text-xs text-slate-400 mb-1">Acessos totais</p><p class="text-2xl font-bold" id="s-cliques">0</p></div>
+      <div class="glass p-4 rounded-2xl"><p class="text-xs text-slate-400 mb-1">Google Reviews</p><p class="text-2xl font-bold" id="s-google">0</p></div>
+    </div>
+    <div class="glass rounded-2xl overflow-hidden">
+      <div class="p-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div><h2 class="font-bold">Suas Placas</h2><p class="text-xs text-slate-400">O QR/NFC aponta sempre para o link fixo; aqui você muda o destino.</p></div>
+        <input id="busca" oninput="render()" placeholder="Buscar placa..." class="inp sm:w-48">
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-900/60 text-slate-400 uppercase tracking-wider border-b border-slate-800"><tr>
+            <th class="p-4">Placa</th><th class="p-4">Destino</th><th class="p-4 text-center">Acessos</th><th class="p-4 text-center">Status</th><th class="p-4 text-right">Ações</th></tr></thead>
+          <tbody id="tbody" class="divide-y divide-slate-800 text-slate-300"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="lg:col-span-5 xl:col-span-4 flex flex-col items-center">
+    <div class="sticky top-20 flex flex-col items-center w-full max-w-sm">
+      <p class="text-xs font-semibold text-indigo-400 mb-2">Simulador do celular do cliente</p>
+      <div class="w-[280px] h-[520px] bg-black rounded-[44px] p-3 border-4 border-slate-700 shadow-2xl">
+        <div class="w-full h-full bg-slate-900 rounded-[32px] overflow-hidden flex flex-col border border-slate-800">
+          <div class="pt-6 px-4 pb-2 bg-slate-950 border-b border-slate-800 text-[10px] font-mono text-slate-300 truncate"><i class="fa-solid fa-lock text-emerald-400 mr-1"></i><span id="sim-url">—</span></div>
+          <div id="sim" class="flex-1 p-4 flex flex-col items-center justify-center text-center gap-2"></div>
+        </div>
+      </div>
+      <div class="mt-4 flex gap-2 w-[280px]">
+        <button onclick="simular()" class="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium py-2 rounded-xl"><i class="fa-solid fa-wifi text-indigo-400 mr-1"></i> Simular toque NFC</button>
+        <button onclick="abrirQR(sel)" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-2 rounded-xl"><i class="fa-solid fa-qrcode text-indigo-400"></i></button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Modal cadastro/edição -->
+<div id="m-form" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <form onsubmit="salvar(event)" class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 relative">
+    <button type="button" onclick="fechar('m-form')" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+    <h3 id="f-titulo" class="text-lg font-bold"></h3>
+    <input type="hidden" id="f-id">
+    <div><label class="block text-xs font-semibold mb-1">Código da placa</label><input id="f-codigo" required maxlength="30" placeholder="Ex: LK-99201" class="inp font-mono"></div>
+    <div><label class="block text-xs font-semibold mb-1">Nome / localização</label><input id="f-nome" required maxlength="80" placeholder="Ex: Balcão - Avaliações" class="inp"></div>
+    <div><label class="block text-xs font-semibold mb-1">Tipo de destino</label>
+      <select id="f-tipo" onchange="dica()" class="inp">
+        <option value="google">Avaliação Google Maps</option><option value="instagram">Instagram</option>
+        <option value="whatsapp">WhatsApp</option><option value="pix">Chave PIX (copia e cola)</option><option value="cardapio">Cardápio / Website</option>
+      </select></div>
+    <div><label id="f-url-label" class="block text-xs font-semibold mb-1">URL de destino</label><input id="f-url" required class="inp"></div>
+    <label class="flex items-center gap-2 text-xs"><input type="checkbox" id="f-ativa" checked> Placa ativa</label>
+    <p id="f-erro" class="text-xs text-rose-400 hidden"></p>
+    <div class="flex gap-2"><button type="button" onclick="fechar('m-form')" class="w-1/2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold py-2.5 rounded-xl">Cancelar</button>
+      <button class="w-1/2 bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold py-2.5 rounded-xl">Salvar</button></div>
+  </form>
+</div>
+
+<!-- Modal QR -->
+<div id="m-qr" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-6 text-center relative">
+    <button onclick="fechar('m-qr')" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+    <h3 id="qr-nome" class="font-bold mb-1"></h3>
+    <p id="qr-link" class="text-[11px] text-slate-400 font-mono mb-4 break-all"></p>
+    <div class="bg-white p-4 rounded-2xl inline-block mb-4" id="qr"></div>
+    <p class="text-[11px] text-slate-400 mb-4">Link fixo: grave também na etiqueta NFC. Mude o destino aqui sem reimprimir.</p>
+    <div class="flex gap-2"><button onclick="baixarQR()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold py-2 rounded-xl"><i class="fa-solid fa-download mr-1"></i> Baixar PNG</button>
+      <button onclick="copiarLink()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-xs font-semibold py-2 rounded-xl"><i class="fa-solid fa-copy mr-1"></i> Copiar link</button></div>
+  </div>
+</div>
+
+<div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 text-xs px-4 py-2 rounded-xl z-[70]"></div>
+
+<script>
+let placas = [], sel = null, cfg = { negocio: '', base: '' }, linkAtual = '';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ICON = {google:'fa-brands fa-google text-amber-400', instagram:'fa-brands fa-instagram text-pink-400',
+  whatsapp:'fa-brands fa-whatsapp text-emerald-400', pix:'fa-brands fa-pix text-teal-400', cardapio:'fa-solid fa-utensils text-orange-400'};
+const NOMES = {google:'Avaliação Google', instagram:'Instagram', whatsapp:'WhatsApp', pix:'Pagamento PIX', cardapio:'Cardápio / Site'};
+const link = p => (cfg.base || location.origin) + '/r/' + p.codigo;
+
+function toast(m) { const t = $('toast'); t.textContent = m; t.classList.remove('hidden'); setTimeout(() => t.classList.add('hidden'), 3000); }
+function abrir(id) { $(id).classList.remove('hidden'); }
+function fechar(id) { $(id).classList.add('hidden'); }
+function mostrarLogin() { abrir('login'); $('senha').focus(); }
+
+async function api(path, method = 'GET', body) {
+  const r = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  if (r.status === 401 && path !== '/api/login') { mostrarLogin(); throw new Error('Sessão expirada.'); }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.erro || 'Erro inesperado.');
+  return d;
+}
+
+async function entrar(e) {
+  e.preventDefault();
+  try { await api('/api/login', 'POST', { senha: $('senha').value }); $('senha').value = ''; fechar('login'); iniciar(); }
+  catch (err) { const el = $('login-erro'); el.textContent = err.message; el.classList.remove('hidden'); }
+}
+async function sair() { await api('/api/logout', 'POST').catch(() => {}); placas = []; render(); mostrarLogin(); }
+
+async function iniciar() {
+  try {
+    cfg = await api('/api/config');
+    $('negocio').textContent = cfg.negocio;
+    await carregar();
+  } catch (e) { if (e.message !== 'Sessão expirada.') toast(e.message); }
+}
+async function carregar() {
+  placas = await api('/api/placas');
+  if (!placas.some(p => p.id === sel)) sel = placas[0]?.id ?? null;
+  render();
+}
+
+function render() {
+  const q = $('busca').value.toLowerCase();
+  $('s-ativas').textContent = placas.filter(p => p.ativa).length + '/' + placas.length;
+  $('s-cliques').textContent = placas.reduce((a, p) => a + p.cliques, 0);
+  $('s-google').textContent = placas.filter(p => p.tipo === 'google').reduce((a, p) => a + p.cliques, 0);
+  const lista = placas.filter(p => p.codigo.toLowerCase().includes(q) || p.nome.toLowerCase().includes(q));
+  $('tbody').innerHTML = lista.map(p => `
+    <tr data-id="${p.id}" class="cursor-pointer hover:bg-slate-800/40 ${p.id === sel ? 'bg-indigo-950/30' : ''}">
+      <td class="p-4"><div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center"><i class="${ICON[p.tipo]}"></i></div>
+        <div><b class="font-mono text-white block">#${esc(p.codigo)}</b><span class="text-[11px] text-slate-400 block truncate max-w-[140px]">${esc(p.nome)}</span></div></div></td>
+      <td class="p-4"><span class="font-mono truncate max-w-[180px] block" title="${esc(p.url)}">${esc(p.url)}</span></td>
+      <td class="p-4 text-center">${p.cliques}</td>
+      <td class="p-4 text-center"><button data-act="toggle" class="px-2.5 py-1 rounded-full text-[10px] font-semibold border ${p.ativa ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}">${p.ativa ? 'Ativa' : 'Inativa'}</button></td>
+      <td class="p-4 text-right whitespace-nowrap">
+        <button data-act="qr" title="QR Code" class="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white"><i class="fa-solid fa-qrcode"></i></button>
+        <button data-act="edit" title="Editar" class="p-1.5 rounded-lg hover:bg-slate-700 text-indigo-400"><i class="fa-solid fa-pen-to-square"></i></button>
+        <button data-act="del" title="Excluir" class="p-1.5 rounded-lg hover:bg-slate-700 text-slate-500 hover:text-rose-400"><i class="fa-solid fa-trash"></i></button>
+      </td></tr>`).join('') || '<tr><td colspan="5" class="p-8 text-center text-slate-500">Nenhuma placa encontrada.</td></tr>';
+  sim();
+}
+
+$('tbody').addEventListener('click', async e => {
+  const tr = e.target.closest('tr[data-id]'); if (!tr) return;
+  const id = +tr.dataset.id, p = placas.find(x => x.id === id), act = e.target.closest('[data-act]')?.dataset.act;
+  try {
+    if (act === 'toggle') { await api('/api/placas/' + id, 'PUT', { ...p, ativa: !p.ativa }); await carregar(); }
+    else if (act === 'qr') abrirQR(id);
+    else if (act === 'edit') abrirForm(p);
+    else if (act === 'del') { if (confirm(`Excluir a placa #${p.codigo}? O QR/NFC impresso deixará de funcionar.`)) { await api('/api/placas/' + id, 'DELETE'); await carregar(); } }
+    else { sel = id; render(); }
+  } catch (err) { toast(err.message); }
+});
+
+function sim() {
+  const p = placas.find(x => x.id === sel), box = $('sim');
+  if (!p) { $('sim-url').textContent = '—'; box.innerHTML = '<p class="text-xs text-slate-500">Cadastre uma placa.</p>'; return; }
+  $('sim-url').textContent = link(p).replace(/^https?:\/\//, '');
+  if (!p.ativa) { box.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-3xl text-rose-400"></i><h4 class="font-bold text-sm">Placa inativa</h4><p class="text-xs text-slate-400">Esta placa foi desativada pelo estabelecimento.</p>'; return; }
+  box.innerHTML = `<div class="w-14 h-14 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-2xl"><i class="${ICON[p.tipo]}"></i></div>
+    <span class="text-[10px] uppercase tracking-widest text-slate-400">${NOMES[p.tipo]}</span>
+    <h4 class="font-bold text-sm">${esc(p.nome)}</h4>
+    <p class="text-[11px] text-slate-400 break-all max-w-[200px]">${p.tipo === 'pix' ? 'Mostra a chave PIX para copiar' : 'Redireciona para ' + esc(p.url)}</p>
+    <a href="/r/${encodeURIComponent(p.codigo)}" target="_blank" onclick="setTimeout(carregar,800)" class="mt-2 w-full bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold py-2.5 rounded-xl">Abrir link real</a>`;
+}
+async function simular() {
+  const p = placas.find(x => x.id === sel);
+  if (!p) return;
+  if (!p.ativa) return toast('Placa inativa: não conta acesso.');
+  await fetch('/r/' + encodeURIComponent(p.codigo), { redirect: 'manual' }); // conta 1 acesso no servidor
+  await carregar(); toast('Toque simulado registrado.');
+}
+
+function dica() {
+  const t = $('f-tipo').value, u = $('f-url');
+  $('f-url-label').textContent = t === 'pix' ? 'Chave PIX (copia e cola)' : 'URL de destino';
+  u.placeholder = { google:'https://g.page/r/...', instagram:'https://instagram.com/seuperfil', whatsapp:'https://wa.me/5511999999999', pix:'Chave ou código copia e cola', cardapio:'https://...' }[t];
+}
+function abrirForm(p) {
+  $('f-erro').classList.add('hidden');
+  $('f-titulo').textContent = p ? 'Editar placa' : 'Nova placa NFC / QR';
+  $('f-id').value = p?.id ?? ''; $('f-codigo').value = p?.codigo ?? ''; $('f-codigo').readOnly = !!p;
+  $('f-codigo').classList.toggle('opacity-50', !!p);
+  $('f-nome').value = p?.nome ?? ''; $('f-tipo').value = p?.tipo ?? 'google'; $('f-url').value = p?.url ?? '';
+  $('f-ativa').checked = p ? !!p.ativa : true; dica(); abrir('m-form');
+}
+async function salvar(e) {
+  e.preventDefault();
+  const id = $('f-id').value, body = { codigo: $('f-codigo').value, nome: $('f-nome').value, tipo: $('f-tipo').value, url: $('f-url').value, ativa: $('f-ativa').checked };
+  try {
+    const r = await api(id ? '/api/placas/' + id : '/api/placas', id ? 'PUT' : 'POST', body);
+    if (!id) sel = r.id;
+    fechar('m-form'); await carregar(); toast('Placa salva.');
+  } catch (err) { const el = $('f-erro'); el.textContent = err.message; el.classList.remove('hidden'); }
+}
+
+function abrirQR(id) {
+  const p = placas.find(x => x.id === id); if (!p) return toast('Selecione uma placa.');
+  linkAtual = link(p); $('qr-nome').textContent = p.nome; $('qr-link').textContent = linkAtual;
+  $('qr').innerHTML = '';
+  new QRCode($('qr'), { text: linkAtual, width: 512, height: 512, colorDark: '#0f172a', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+  abrir('m-qr');
+}
+function baixarQR() {
+  const c = $('qr').querySelector('canvas'), a = document.createElement('a');
+  a.href = c.toDataURL('image/png'); a.download = 'qr-' + linkAtual.split('/').pop() + '.png'; a.click();
+}
+async function copiarLink() { try { await navigator.clipboard.writeText(linkAtual); toast('Link copiado.'); } catch { toast('Não foi possível copiar.'); } }
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') ['m-form', 'm-qr'].forEach(fechar); });
+iniciar();
+</script>
+</body>
+</html>
