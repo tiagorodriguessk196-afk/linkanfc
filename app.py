@@ -1,3 +1,4 @@
+import zipfile
 import io
 import os
 import re
@@ -241,6 +242,33 @@ def gerar_qrcode(codigo):
     )
 
 
+@app.get("/api/placas/lote/qrcodes.zip")
+@auth
+def baixar_lote_zip():
+    rows = db().execute("SELECT codigo FROM placas ORDER BY codigo ASC").fetchall()
+    if not rows:
+        return jsonify(erro="Nenhuma placa cadastrada."), 404
+
+    base = PUBLIC_URL if PUBLIC_URL else request.host_url.rstrip("/")
+    zip_buf = io.BytesIO()
+
+    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for r in rows:
+            cod = r["codigo"]
+            qr = qrcode.QRCode(
+                version=1, error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=2)
+            qr.add_data(f"{base}/r/{cod}")
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+
+            img_buf = io.BytesIO()
+            img.save(img_buf, format="PNG")
+            zf.writestr(f"{cod}.png", img_buf.getvalue())
+
+    zip_buf.seek(0)
+    return send_file(zip_buf, mimetype="application/zip", as_attachment=True, download_name="qrcodes_lote.zip")
+
+
 # ---------- Redirecionamento público (o que o NFC/QR abre) ----------
 PAGINA = """<!doctype html><html lang="pt-BR"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{{t}}</title>
@@ -257,14 +285,15 @@ def redirecionar(codigo):
     if not p:
         return render_template_string(PAGINA, t="Placa não encontrada", m="Este código não existe no sistema."), 404
 
-    # Se a placa está inativa ou ainda com o link padrão de não configurada
-    if not p["ativa"] or (p["url"] == "https://google.com" and "Não configurada" in p["nome"]):
+    # 1º Se ainda é uma placa virgem do lote (nunca foi editada)
+    if p["url"] == "https://google.com" and "Não configurada" in p["nome"]:
         return render_template_string(
             PAGINA,
             t="Placa aguardando configuração",
-            m=f"A placa <code>{p['codigo']}</code> ainda não foi configurada pelo estabelecimento."
+            m=f"A placa {p['codigo']} ainda não foi configurada pelo estabelecimento."
         ), 200
 
+    # 2º Se já foi configurada, mas você desativou depois no painel
     if not p["ativa"]:
         return render_template_string(PAGINA, t="Placa inativa", m="Esta placa foi desativada pelo estabelecimento."), 410
 
