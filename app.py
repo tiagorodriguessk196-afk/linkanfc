@@ -1,3 +1,4 @@
+import io
 import os
 import re
 import secrets
@@ -5,8 +6,9 @@ import sqlite3
 import time
 from functools import wraps
 from urllib.parse import urlparse
+import qrcode
 from flask import (Flask, g, jsonify, redirect, render_template_string,
-                   request, send_from_directory, session)
+                   request, send_file, send_from_directory, session)
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 DB = os.environ.get("DB_PATH", os.path.join(BASE, "linkanfc.db"))
@@ -202,6 +204,41 @@ def excluir(pid):
     db().execute("DELETE FROM placas WHERE id=?", (pid,))
     db().commit()
     return jsonify(ok=True)
+
+# <--- COLE A ROTA AQUI EMBAIXO (sem espaços na margem esquerda) --->
+
+
+@app.get("/api/placas/<codigo>/qrcode")
+@auth
+def gerar_qrcode(codigo):
+    cod = codigo.upper()
+    p = db().execute("SELECT codigo FROM placas WHERE codigo=?", (cod,)).fetchone()
+    if not p:
+        return jsonify(erro="Placa não encontrada."), 404
+
+    base = PUBLIC_URL if PUBLIC_URL else request.host_url.rstrip("/")
+    link_destino = f"{base}/r/{cod}"
+
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=2,
+    )
+    qr.add_data(link_destino)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+
+    return send_file(
+        buf,
+        mimetype="image/png",
+        as_attachment=False,
+        download_name=f"qrcode_{cod}.png"
+    )
 
 
 # ---------- Redirecionamento público (o que o NFC/QR abre) ----------
